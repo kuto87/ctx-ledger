@@ -1,0 +1,9 @@
+.ctx-ledger/generated/
+.ctx-ledger/cache/
+.ctx-ledger/sent/
+__pycache__/
+.pytest_cache/
+.venv/
+dist/
+build/
+*.egg-info/
