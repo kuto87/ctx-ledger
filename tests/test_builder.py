@@ -20,3 +20,21 @@ def test_render_next_prompt_contains_core_sections() -> None:
     assert "- README.md" in redacted
     assert "<OPENAI_API_KEY>" in redacted
     assert "sk-abc123456789" not in redacted
+
+
+def test_render_next_prompt_supports_japanese() -> None:
+    snapshot = {
+        "branch": "main",
+        "latest_commit": {"short_hash": "abc123", "subject": "Initial commit"},
+        "dirty": False,
+        "changed_files": [],
+        "diff_stat": "",
+    }
+
+    prompt = render_next_prompt(snapshot, ["# Note\n\n日本語メモ"], "chatgpt", None, False, "ja")
+
+    assert "# 次のプロンプト" in prompt
+    assert "## 現在のメモ" in prompt
+    assert "- ブランチ: main" in prompt
+    assert "- 作業ツリー: クリーン" in prompt
+    assert "- メモはまだありません。" not in prompt

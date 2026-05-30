@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import sys
 from typing import Optional
 
 import typer
@@ -10,7 +11,7 @@ from rich.console import Console
 from rich.table import Table
 
 from . import git_utils
-from .builder import build_context_packs
+from .builder import build_context_packs, validate_language
 from .clipboard import copy_text
 from .ledger import record_sent
 from .notes import create_note
@@ -18,6 +19,11 @@ from .paths import ensure_initialized
 from .snapshot import create_snapshot
 from .status import collect_status
 
+
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8")
 
 app = typer.Typer(
     help="Generate clean context packs for AI coding agents.",
@@ -62,11 +68,13 @@ def ask(
     budget: Optional[int] = typer.Option(None, help="Optional context budget hint."),
     fresh: bool = typer.Option(False, help="Mark this as a fresh/recovery handoff."),
     no_copy: bool = typer.Option(False, help="Do not copy NEXT_PROMPT.md to the clipboard."),
+    lang: str = typer.Option("en", help="Output language: en or ja."),
 ) -> None:
     """Build Markdown context packs for the next AI-agent handoff."""
 
     try:
-        outputs = build_context_packs(Path.cwd(), target=target, budget=budget, fresh=fresh)
+        language = validate_language(lang)
+        outputs = build_context_packs(Path.cwd(), target=target, budget=budget, fresh=fresh, language=language)
     except (git_utils.GitError, ValueError) as exc:
         raise typer.BadParameter(str(exc)) from exc
     next_prompt = outputs["next_prompt"]
@@ -74,15 +82,35 @@ def ask(
     console.print(f"[green]Built[/green] {outputs['delta_pack'].relative_to(Path.cwd())}")
     console.print(f"[green]Built[/green] {outputs['recovery_pack'].relative_to(Path.cwd())}")
     if no_copy:
-        console.print("[yellow]Skipped clipboard copy[/yellow]")
+        console.print(
+            "[yellow]Clipboard copy skipped[/yellow]"
+            if language == "en"
+            else "[yellow]クリップボードへのコピーをスキップしました[/yellow]"
+        )
         return
     copied, error = copy_text(next_prompt.read_text(encoding="utf-8"))
     if copied:
-        console.print("[green]Copied prompt to clipboard[/green]")
-        console.print("Paste it into ChatGPT / Codex / Claude Code / Cursor.")
+        console.print(
+            "[green]Copied prompt to clipboard[/green]"
+            if language == "en"
+            else "[green]プロンプトをクリップボードにコピーしました[/green]"
+        )
+        console.print(
+            "Paste it into ChatGPT / Codex / Claude Code / Cursor."
+            if language == "en"
+            else "ChatGPT / Codex / Claude Code / Cursor に貼り付けてください。"
+        )
     else:
-        console.print(f"[yellow]Clipboard copy failed[/yellow] {error}")
-        console.print(f"Prompt is still available at {next_prompt.relative_to(Path.cwd())}")
+        console.print(
+            f"[yellow]Clipboard copy failed[/yellow] {error}"
+            if language == "en"
+            else f"[yellow]クリップボードへのコピーに失敗しました[/yellow] {error}"
+        )
+        console.print(
+            f"Prompt is still available at {next_prompt.relative_to(Path.cwd())}"
+            if language == "en"
+            else f"プロンプトは {next_prompt.relative_to(Path.cwd())} に保存されています"
+        )
 
 
 @app.command()
@@ -97,20 +125,45 @@ def sent(target: str = typer.Option(..., help="Target AI tool that received the 
 
 
 @app.command()
-def status() -> None:
+def status(lang: str = typer.Option("en", help="Output language: en or ja.")) -> None:
     """Show ctx-ledger and Git status."""
 
+    try:
+        language = validate_language(lang)
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc)) from exc
     data = collect_status(Path.cwd())
-    table = Table(title="ctx-ledger status")
-    table.add_column("Field")
-    table.add_column("Value")
-    table.add_row("Initialized", "yes" if data["initialized"] else "no")
-    table.add_row("Git branch", str(data["branch"]))
-    table.add_row("Notes", str(data["note_count"]))
-    table.add_row("Latest prompt", data["latest_prompt"] or "(none)")
-    table.add_row("Last sent target", data["last_sent_target"] or "(none)")
-    table.add_row("Dirty", str(data["dirty"]))
+    if language == "ja":
+        table = Table(title="ctx-ledger 状態")
+        table.add_column("項目")
+        table.add_column("値")
+        table.add_row("初期化済み", "はい" if data["initialized"] else "いいえ")
+        table.add_row("Git ブランチ", str(data["branch"]))
+        table.add_row("メモ数", str(data["note_count"]))
+        table.add_row("最新プロンプト", data["latest_prompt"] or "(なし)")
+        table.add_row("最後の送信先", data["last_sent_target"] or "(なし)")
+        table.add_row("未コミット変更", format_dirty(data["dirty"], language))
+    else:
+        table = Table(title="ctx-ledger status")
+        table.add_column("Field")
+        table.add_column("Value")
+        table.add_row("Initialized", "yes" if data["initialized"] else "no")
+        table.add_row("Git branch", str(data["branch"]))
+        table.add_row("Notes", str(data["note_count"]))
+        table.add_row("Latest prompt", data["latest_prompt"] or "(none)")
+        table.add_row("Last sent target", data["last_sent_target"] or "(none)")
+        table.add_row("Dirty", format_dirty(data["dirty"], language))
     console.print(table)
+
+
+def format_dirty(value: object, language: str) -> str:
+    """Format dirty state for status output."""
+
+    if isinstance(value, bool):
+        if language == "ja":
+            return "あり" if value else "なし"
+        return "yes" if value else "no"
+    return str(value)
 
 
 if __name__ == "__main__":

@@ -37,9 +37,11 @@ ctx note "message"
 ctx snap
 ctx ask
 ctx ask --target codex --budget 4000 --fresh
+ctx ask --lang ja
 ctx ask --no-copy
 ctx sent --target chatgpt
 ctx status
+ctx status --lang ja
 ```
 
 ## Example output
@@ -92,6 +94,22 @@ Not included:
 ## Local-first by default
 
 `ctx-ledger` does not call OpenAI, Anthropic, or any other AI service. It does not require an API key. Generated context packs are local Markdown files.
+
+## Japanese output
+
+Use `--lang ja` to generate Japanese handoff packs or show status labels in Japanese:
+
+```powershell
+ctx ask --lang ja
+ctx ask --target chatgpt --budget 4000 --fresh --lang ja
+ctx status --lang ja
+```
+
+Notes can be written in Japanese without extra options:
+
+```powershell
+ctx note "次に実装する内容を整理する"
+```
 
 ## Roadmap
 
