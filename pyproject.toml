@@ -19,7 +19,16 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0,<9"]
+dev = [
+  "pytest>=8.0,<9",
+  "build>=1.0,<2",
+  "twine>=5.0,<7",
+]
+
+[project.urls]
+Homepage = "https://github.com/kuto87/ctx-ledger"
+Repository = "https://github.com/kuto87/ctx-ledger"
+Issues = "https://github.com/kuto87/ctx-ledger/issues"
 
 [project.scripts]
 ctx = "ctx_ledger.cli:app"

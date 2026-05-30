@@ -10,6 +10,12 @@ import yaml
 
 
 LEDGER_DIR = ".ctx-ledger"
+DEFAULT_CONFIG = {
+    "version": "0.1.0",
+    "default_target": "chatgpt",
+    "default_language": "en",
+    "default_budget": None,
+}
 
 
 @dataclass(frozen=True)
@@ -73,13 +79,9 @@ def ensure_initialized(root: Path | str = ".") -> LedgerPaths:
     for directory in managed_directories(paths):
         directory.mkdir(parents=True, exist_ok=True)
     if not paths.config.exists():
-        paths.config.write_text(
-            yaml.safe_dump(
-                {"version": "0.1.0", "default_target": "chatgpt"},
-                sort_keys=False,
-            ),
-            encoding="utf-8",
-        )
+        write_config(DEFAULT_CONFIG, root)
+    else:
+        save_config(load_config(root), root)
     update_gitignore(paths.root)
     return paths
 
@@ -88,6 +90,38 @@ def is_initialized(root: Path | str = ".") -> bool:
     """Return whether a project has a ctx-ledger directory."""
 
     return project_paths(root).ledger.is_dir()
+
+
+def load_config(root: Path | str = ".") -> dict[str, object]:
+    """Load config.yml with defaults for missing values."""
+
+    paths = project_paths(root)
+    config = DEFAULT_CONFIG.copy()
+    if paths.config.exists():
+        try:
+            loaded = yaml.safe_load(paths.config.read_text(encoding="utf-8")) or {}
+        except yaml.YAMLError:
+            loaded = {}
+        if isinstance(loaded, dict):
+            config.update(loaded)
+    return config
+
+
+def save_config(config: dict[str, object], root: Path | str = ".") -> Path:
+    """Write config.yml after merging with defaults."""
+
+    merged = DEFAULT_CONFIG.copy()
+    merged.update(config)
+    return write_config(merged, root)
+
+
+def write_config(config: dict[str, object], root: Path | str = ".") -> Path:
+    """Write config.yml."""
+
+    paths = project_paths(root)
+    paths.ledger.mkdir(parents=True, exist_ok=True)
+    paths.config.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
+    return paths.config
 
 
 def update_gitignore(root: Path) -> None:

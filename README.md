@@ -20,6 +20,8 @@ AI coding agents work better when they have clear project context. Repeating tha
 ## Quickstart
 
 ```powershell
+git clone https://github.com/kuto87/ctx-ledger.git
+cd ctx-ledger
 python -m pip install -e ".[dev]"
 ctx init
 ctx note "Implement the first CLI workflow."
@@ -28,6 +30,18 @@ ctx ask --target chatgpt
 ```
 
 `ctx ask` writes Markdown files to `.ctx-ledger/generated/` and copies `NEXT_PROMPT.md` to the clipboard by default.
+
+You can also install directly from GitHub:
+
+```powershell
+python -m pip install "ctx-ledger @ git+https://github.com/kuto87/ctx-ledger.git"
+```
+
+PyPI publishing is supported by the project metadata. After a release is published to PyPI, installation can become:
+
+```powershell
+python -m pip install ctx-ledger
+```
 
 ## Commands
 
@@ -42,6 +56,8 @@ ctx ask --no-copy
 ctx sent --target chatgpt
 ctx status
 ctx status --lang ja
+ctx config --lang ja --target chatgpt --budget 4000
+ctx doctor
 ```
 
 ## Example output
@@ -110,6 +126,31 @@ Notes can be written in Japanese without extra options:
 ```powershell
 ctx note "次に実装する内容を整理する"
 ```
+
+Set Japanese as the project default:
+
+```powershell
+ctx config --lang ja
+ctx ask
+ctx status
+```
+
+## Environment checks
+
+Use `ctx doctor` to check whether the current machine is ready:
+
+```powershell
+ctx doctor
+ctx doctor --lang ja
+```
+
+It checks Python, Git, whether the current directory is a Git repository, whether `.ctx-ledger` is initialized, clipboard availability, and current defaults.
+
+If Git is not installed, Git-dependent commands show a friendly error instead of a raw traceback.
+
+## Portability
+
+`ctx-ledger` does not require the GitHub username `kuto87` at runtime. That name only appears in this repository's public URL and package metadata. Other users can clone, fork, or install the project and use `ctx` in their own Git repositories without changing the code.
 
 ## Roadmap
 

@@ -11,11 +11,12 @@ from rich.console import Console
 from rich.table import Table
 
 from . import git_utils
-from .builder import build_context_packs, validate_language
+from .builder import build_context_packs, validate_language, validate_target
 from .clipboard import copy_text
+from .doctor import collect_doctor
 from .ledger import record_sent
 from .notes import create_note
-from .paths import ensure_initialized
+from .paths import ensure_initialized, load_config, save_config
 from .snapshot import create_snapshot
 from .status import collect_status
 
@@ -64,17 +65,26 @@ def snap() -> None:
 
 @app.command()
 def ask(
-    target: str = typer.Option("chatgpt", help="Target AI tool: chatgpt, codex, claude, cursor."),
+    target: Optional[str] = typer.Option(None, help="Target AI tool: chatgpt, codex, claude, cursor."),
     budget: Optional[int] = typer.Option(None, help="Optional context budget hint."),
     fresh: bool = typer.Option(False, help="Mark this as a fresh/recovery handoff."),
     no_copy: bool = typer.Option(False, help="Do not copy NEXT_PROMPT.md to the clipboard."),
-    lang: str = typer.Option("en", help="Output language: en or ja."),
+    lang: Optional[str] = typer.Option(None, help="Output language: en or ja."),
 ) -> None:
     """Build Markdown context packs for the next AI-agent handoff."""
 
     try:
-        language = validate_language(lang)
-        outputs = build_context_packs(Path.cwd(), target=target, budget=budget, fresh=fresh, language=language)
+        config = load_config(Path.cwd())
+        chosen_target = validate_target(str(target or config.get("default_target") or "chatgpt"))
+        language = validate_language(str(lang or config.get("default_language") or "en"))
+        chosen_budget = budget if budget is not None else normalize_budget(config.get("default_budget"))
+        outputs = build_context_packs(
+            Path.cwd(),
+            target=chosen_target,
+            budget=chosen_budget,
+            fresh=fresh,
+            language=language,
+        )
     except (git_utils.GitError, ValueError) as exc:
         raise typer.BadParameter(str(exc)) from exc
     next_prompt = outputs["next_prompt"]
@@ -125,11 +135,12 @@ def sent(target: str = typer.Option(..., help="Target AI tool that received the 
 
 
 @app.command()
-def status(lang: str = typer.Option("en", help="Output language: en or ja.")) -> None:
+def status(lang: Optional[str] = typer.Option(None, help="Output language: en or ja.")) -> None:
     """Show ctx-ledger and Git status."""
 
     try:
-        language = validate_language(lang)
+        config = load_config(Path.cwd())
+        language = validate_language(str(lang or config.get("default_language") or "en"))
     except ValueError as exc:
         raise typer.BadParameter(str(exc)) from exc
     data = collect_status(Path.cwd())
@@ -156,6 +167,70 @@ def status(lang: str = typer.Option("en", help="Output language: en or ja.")) ->
     console.print(table)
 
 
+@app.command("config")
+def configure(
+    target: Optional[str] = typer.Option(None, help="Default target: chatgpt, codex, claude, cursor."),
+    lang: Optional[str] = typer.Option(None, help="Default output language: en or ja."),
+    budget: Optional[int] = typer.Option(None, help="Default context budget hint."),
+    clear_budget: bool = typer.Option(False, help="Clear the default budget hint."),
+) -> None:
+    """Show or update ctx-ledger defaults."""
+
+    paths = ensure_initialized(Path.cwd())
+    config = load_config(Path.cwd())
+    changed = False
+    try:
+        if target is not None:
+            config["default_target"] = validate_target(target)
+            changed = True
+        if lang is not None:
+            config["default_language"] = validate_language(lang)
+            changed = True
+        if budget is not None:
+            config["default_budget"] = budget
+            changed = True
+        if clear_budget:
+            config["default_budget"] = None
+            changed = True
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+
+    if changed:
+        save_config(config, Path.cwd())
+        console.print(f"[green]Updated config[/green] {paths.config.relative_to(paths.root)}")
+    else:
+        console.print(f"[green]Config[/green] {paths.config.relative_to(paths.root)}")
+    print_config_table(config)
+
+
+@app.command()
+def doctor(lang: str = typer.Option("en", help="Output language: en or ja.")) -> None:
+    """Check local requirements and project readiness."""
+
+    try:
+        language = validate_language(lang)
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    checks = collect_doctor(Path.cwd())
+    table = Table(title="ctx-ledger doctor" if language == "en" else "ctx-ledger 診断")
+    table.add_column("Check" if language == "en" else "確認")
+    table.add_column("Status" if language == "en" else "状態")
+    table.add_column("Detail" if language == "en" else "詳細")
+    table.add_column("Fix" if language == "en" else "対応")
+    for check in checks:
+        ok = bool(check["ok"])
+        status_text = "[green]OK[/green]" if ok else "[red]Needs action[/red]"
+        if language == "ja":
+            status_text = "[green]OK[/green]" if ok else "[red]対応が必要[/red]"
+        table.add_row(
+            str(check["name"]),
+            status_text,
+            str(check["detail"]),
+            "" if ok else str(check["fix"]),
+        )
+    console.print(table)
+
+
 def format_dirty(value: object, language: str) -> str:
     """Format dirty state for status output."""
 
@@ -164,6 +239,29 @@ def format_dirty(value: object, language: str) -> str:
             return "あり" if value else "なし"
         return "yes" if value else "no"
     return str(value)
+
+
+def normalize_budget(value: object) -> Optional[int]:
+    """Convert config budget values into an optional integer."""
+
+    if value in (None, ""):
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("default_budget must be a number or null.") from exc
+
+
+def print_config_table(config: dict[str, object]) -> None:
+    """Print current config defaults."""
+
+    table = Table(title="ctx-ledger config")
+    table.add_column("Setting")
+    table.add_column("Value")
+    table.add_row("default_target", str(config.get("default_target") or "chatgpt"))
+    table.add_row("default_language", str(config.get("default_language") or "en"))
+    table.add_row("default_budget", str(config.get("default_budget") or "(none)"))
+    console.print(table)
 
 
 if __name__ == "__main__":

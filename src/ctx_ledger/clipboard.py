@@ -13,3 +13,15 @@ def copy_text(text: str) -> tuple[bool, str | None]:
     except pyperclip.PyperclipException as exc:
         return False, str(exc)
     return True, None
+
+
+def check_clipboard() -> tuple[bool, str | None]:
+    """Check whether a clipboard backend appears usable without changing it."""
+
+    try:
+        if hasattr(pyperclip, "is_available") and pyperclip.is_available():
+            return True, None
+        pyperclip.paste()
+    except pyperclip.PyperclipException as exc:
+        return False, str(exc)
+    return True, None

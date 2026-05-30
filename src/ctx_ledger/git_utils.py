@@ -13,13 +13,16 @@ class GitError(RuntimeError):
 def run_git(args: list[str], cwd: Path | str = ".") -> subprocess.CompletedProcess[str]:
     """Run a Git command and capture text output."""
 
-    return subprocess.run(
-        ["git", *args],
-        cwd=Path(cwd),
-        text=True,
-        capture_output=True,
-        check=False,
-    )
+    try:
+        return subprocess.run(
+            ["git", *args],
+            cwd=Path(cwd),
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+    except FileNotFoundError as exc:
+        raise GitError("Git was not found. Please install Git and try again.") from exc
 
 
 def ensure_git_repo(cwd: Path | str = ".") -> None:

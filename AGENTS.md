@@ -14,6 +14,8 @@ Implement a small local-first Python CLI with these commands:
 - `ctx ask`
 - `ctx sent --target chatgpt`
 - `ctx status`
+- `ctx config`
+- `ctx doctor`
 
 Do not add AI API integrations, GUI features, cloud sync, RAG/vector search, or automatic source-code modification in v0.1.0.
 
@@ -29,6 +31,7 @@ Do not add AI API integrations, GUI features, cloud sync, RAG/vector search, or 
 - `src/ctx_ledger/redaction.py`: Secret and personal-info redaction.
 - `src/ctx_ledger/ledger.py`: Sent handoff history.
 - `src/ctx_ledger/status.py`: Status display data.
+- `src/ctx_ledger/doctor.py`: Environment readiness checks.
 
 ## Commands
 
@@ -40,6 +43,8 @@ ctx ask --target chatgpt --budget 4000
 ctx ask --no-copy
 ctx sent --target chatgpt
 ctx status
+ctx config --lang ja --target chatgpt --budget 4000
+ctx doctor
 ```
 
 ## Test instructions
@@ -94,6 +99,16 @@ When asked to release:
 5. Create and push a semantic version tag.
 6. Report the repository URL and tag.
 
+For PyPI release preparation:
+
+```powershell
+python -m pip install -e ".[dev]"
+python -m build
+python -m twine check dist/*
+```
+
+Publishing to PyPI requires PyPI credentials or a trusted publishing setup.
+
 ## Definition of done
 
 - `ctx init` works.
@@ -106,6 +121,7 @@ When asked to release:
 - README.md explains the project clearly.
 - AGENTS.md includes future AI editing guidance.
 - Basic pytest tests pass.
+- `ctx doctor` reports useful environment readiness information.
 - Git commit exists.
 - GitHub repository exists and is public.
 - `main` is pushed.
