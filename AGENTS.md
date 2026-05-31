@@ -4,11 +4,12 @@
 
 `ctx-ledger` helps developers stop repeating project context when using AI coding agents. It records notes, Git state, generated context packs, and sent handoff history in a local `.ctx-ledger` directory.
 
-## v0.1.0 scope
+## Current scope
 
-Implement a small local-first Python CLI with these commands:
+Maintain a small local-first Python CLI with these commands:
 
 - `ctx init`
+- `ctx handoff "message"`
 - `ctx note "message"`
 - `ctx snap`
 - `ctx ask`
@@ -17,7 +18,7 @@ Implement a small local-first Python CLI with these commands:
 - `ctx config`
 - `ctx doctor`
 
-Do not add AI API integrations, GUI features, cloud sync, RAG/vector search, or automatic source-code modification in v0.1.0.
+Do not add AI API integrations, GUI features, cloud sync, RAG/vector search, or automatic source-code modification by default.
 
 ## Code map
 
@@ -37,6 +38,7 @@ Do not add AI API integrations, GUI features, cloud sync, RAG/vector search, or 
 
 ```powershell
 ctx init
+ctx handoff "message"
 ctx note "message"
 ctx snap
 ctx ask --target chatgpt --budget 4000
@@ -86,6 +88,7 @@ Keep responsibilities separated:
 - Clipboard helpers belong in `clipboard.py`.
 - Sent history belongs in `ledger.py`.
 - Status display belongs in `status.py`.
+- Environment checks belong in `doctor.py`.
 
 Avoid large rewrites unless explicitly requested.
 
@@ -122,6 +125,8 @@ Publishing to PyPI requires PyPI credentials or a trusted publishing setup.
 - AGENTS.md includes future AI editing guidance.
 - Basic pytest tests pass.
 - `ctx doctor` reports useful environment readiness information.
+- Documentation is clear for English and Japanese readers.
+- GitHub Actions runs tests for pull requests and pushes.
 - Git commit exists.
 - GitHub repository exists and is public.
 - `main` is pushed.

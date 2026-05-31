@@ -1,5 +1,7 @@
 # ctx-ledger
 
+[![tests](https://github.com/kuto87/ctx-ledger/actions/workflows/tests.yml/badge.svg)](https://github.com/kuto87/ctx-ledger/actions/workflows/tests.yml)
+
 **Stop repeating project context.**
 
 Generate clean, copy-ready context packs for ChatGPT, Codex, Claude Code, Cursor, and other AI coding agents.
@@ -7,179 +9,91 @@ Generate clean, copy-ready context packs for ChatGPT, Codex, Claude Code, Cursor
 Git manages your code changes.  
 ctx-ledger manages what your AI agent needs to know.
 
-## Overview
+日本語の説明は [README.ja.md](README.ja.md) を参照してください。
 
-`ctx-ledger` is a local-first CLI tool for developers who use AI coding agents across multiple chats or tools. It records project notes, captures Git state, generates Markdown context packs, copies the next prompt to the clipboard, and records when handoffs are sent.
+## Why
 
-No AI API key is required. The tool works with local files and Git.
+AI coding agents are useful, but project context often gets lost when you start a new chat, switch tools, return days later, or move to another machine. `ctx-ledger` keeps a small local ledger of notes, Git state, generated handoff packs, and sent history so the next AI chat starts with useful context.
 
-## Why it exists
+## Install
 
-AI coding agents work better when they have clear project context. Repeating that context by hand is slow and error-prone. `ctx-ledger` keeps the important handoff details in a small project-local ledger so each new chat can start with cleaner context.
-
-## Quickstart
-
-Most days, remember only one command:
-
-```powershell
-ctx handoff "Describe what changed or what you want next"
-```
-
-It saves the note, snapshots Git, builds the Markdown context packs, and copies `NEXT_PROMPT.md` to the clipboard.
-
-First-time setup in a project:
-
-```powershell
-git clone https://github.com/kuto87/ctx-ledger.git
-cd ctx-ledger
-python -m pip install -e ".[dev]"
-ctx init
-ctx config --lang ja --target chatgpt
-ctx handoff "Implement the first CLI workflow."
-```
-
-`ctx ask` writes Markdown files to `.ctx-ledger/generated/` and copies `NEXT_PROMPT.md` to the clipboard by default.
-
-You can also install directly from GitHub:
+Install from GitHub:
 
 ```powershell
 python -m pip install "ctx-ledger @ git+https://github.com/kuto87/ctx-ledger.git"
 ```
 
-PyPI publishing is supported by the project metadata. After a release is published to PyPI, installation can become:
+For local development:
 
 ```powershell
-python -m pip install ctx-ledger
+git clone https://github.com/kuto87/ctx-ledger.git
+cd ctx-ledger
+python -m pip install -e ".[dev]"
+pytest
 ```
 
-## Commands
+PyPI packaging is ready, but the project is not published on PyPI yet.
+
+## Quickstart
+
+Run this once inside a Git project:
+
+```powershell
+ctx init
+ctx config --lang ja --target chatgpt
+```
+
+Most days, use one command:
+
+```powershell
+ctx handoff "Describe what changed or what you want the next AI chat to do"
+```
+
+This saves a note, snapshots Git, builds Markdown handoff packs, and copies `NEXT_PROMPT.md` to the clipboard.
+
+If you forget the commands, run:
 
 ```powershell
 ctx
-ctx handoff "message"
-ctx init
-ctx note "message"
-ctx snap
-ctx ask
-ctx ask --target codex --budget 4000 --fresh
-ctx ask --lang ja
-ctx ask --no-copy
-ctx sent --target chatgpt
-ctx status
-ctx status --lang ja
-ctx config --lang ja --target chatgpt --budget 4000
-ctx doctor
 ```
 
-Run `ctx` by itself to see a short beginner guide.
+## Common Commands
 
-## Example output
-
-```text
-Built .ctx-ledger/generated/NEXT_PROMPT.md
-Built .ctx-ledger/generated/DELTA_PACK.md
-Built .ctx-ledger/generated/RECOVERY_PACK.md
-Copied prompt to clipboard
-Paste it into ChatGPT / Codex / Claude Code / Cursor.
+```powershell
+ctx handoff "message"       # note + snapshot + prompt
+ctx note "message"          # save a project note
+ctx ask                     # build handoff packs
+ctx status                  # show project status
+ctx doctor                  # check environment readiness
+ctx config --lang ja        # set Japanese output as the default
 ```
 
-## v0.1.0 scope
+Supported output languages are `en` and `ja`. This changes generated handoff text and CLI labels; it does not affect the programming language of your project.
 
-Included:
+`budget` is only a rough context size hint for generated prompts, such as `4000`. It does not call an AI API and does not spend money.
 
-- Local-first CLI
-- Git repository awareness
-- Note saving
-- Git snapshot collection
-- Markdown prompt generation
-- Clipboard copy by default
-- Sent handoff history
-- Basic status command
-- Basic secret redaction
+## Demo
 
-Not included:
+See [docs/demo.md](docs/demo.md) for a short before/after workflow using a sample TODO app.
 
-- AI API integrations
-- VS Code extension
-- GUI
-- Cloud sync
-- RAG or vector search
-- Automatic source-code modification
-- Advanced large-repository optimization
+## Code Map
 
-## Code map
-
-- `src/ctx_ledger/cli.py`: CLI command definitions and wiring only.
-- `src/ctx_ledger/paths.py`: `.ctx-ledger` path management and initialization.
+- `src/ctx_ledger/cli.py`: CLI command definitions and wiring.
+- `src/ctx_ledger/paths.py`: `.ctx-ledger` paths, initialization, and config.
 - `src/ctx_ledger/git_utils.py`: Git subprocess helpers.
 - `src/ctx_ledger/notes.py`: Note creation and loading.
 - `src/ctx_ledger/snapshot.py`: Git snapshot creation and loading.
-- `src/ctx_ledger/builder.py`: Markdown pack generation.
-- `src/ctx_ledger/clipboard.py`: Clipboard copy helper.
+- `src/ctx_ledger/builder.py`: Markdown handoff pack generation.
+- `src/ctx_ledger/clipboard.py`: Clipboard helpers.
 - `src/ctx_ledger/redaction.py`: Secret and personal-info redaction.
 - `src/ctx_ledger/ledger.py`: Sent handoff history.
 - `src/ctx_ledger/status.py`: Status summary collection.
+- `src/ctx_ledger/doctor.py`: Environment readiness checks.
 
-## Local-first by default
+## Project Status
 
-`ctx-ledger` does not call OpenAI, Anthropic, or any other AI service. It does not require an API key. Generated context packs are local Markdown files.
+`ctx-ledger` is an early-stage local-first CLI. It does not integrate with OpenAI, Anthropic, Claude, Cursor, or cloud APIs. It only generates local Markdown files and optionally copies text to your clipboard.
 
-## Context size hint
+## License
 
-`budget` means a rough context size hint for the AI prompt, such as `4000`. It does not spend money and does not call an API. You can ignore it at first.
-
-```powershell
-ctx config --budget 4000
-ctx handoff "Summarize this change for the next AI chat"
-```
-
-## Japanese output
-
-Use `--lang ja` to generate Japanese handoff packs or show status labels in Japanese:
-
-```powershell
-ctx ask --lang ja
-ctx ask --target chatgpt --budget 4000 --fresh --lang ja
-ctx status --lang ja
-```
-
-Notes can be written in Japanese without extra options:
-
-```powershell
-ctx note "次に実装する内容を整理する"
-```
-
-Set Japanese as the project default:
-
-```powershell
-ctx config --lang ja
-ctx ask
-ctx status
-```
-
-## Environment checks
-
-Use `ctx doctor` to check whether the current machine is ready:
-
-```powershell
-ctx doctor
-ctx doctor --lang ja
-```
-
-It checks Python, Git, whether the current directory is a Git repository, whether `.ctx-ledger` is initialized, clipboard availability, and current defaults.
-
-If Git is not installed, Git-dependent commands show a friendly error instead of a raw traceback.
-
-## Portability
-
-`ctx-ledger` does not require the GitHub username `kuto87` at runtime. That name only appears in this repository's public URL and package metadata. Other users can clone, fork, or install the project and use `ctx` in their own Git repositories without changing the code.
-
-## Roadmap
-
-- Configurable prompt templates
-- More target-specific prompt styles
-- Better large-repository summaries
-- Optional note categories
-- Optional release packaging
-
-Suggested GitHub topics: `ai`, `cli`, `developer-tools`, `git`, `context`, `python`.
+MIT
