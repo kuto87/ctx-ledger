@@ -6,6 +6,9 @@ import subprocess
 from pathlib import Path
 
 
+IGNORED_STATUS_PREFIXES = (".ctx-ledger/", ".ctx-ledger\\")
+
+
 class GitError(RuntimeError):
     """Raised when a Git command cannot be completed."""
 
@@ -69,9 +72,16 @@ def changed_files(cwd: Path | str = ".") -> list[str]:
         path = line[3:].strip()
         if " -> " in path:
             path = path.split(" -> ", 1)[1]
-        if path:
+        if path and not is_ignored_status_path(path):
             files.append(path)
     return files
+
+
+def is_ignored_status_path(path: str) -> bool:
+    """Return whether a Git status path should be hidden from context packs."""
+
+    normalized = path.strip().strip('"')
+    return normalized.startswith(IGNORED_STATUS_PREFIXES)
 
 
 def diff_stat(cwd: Path | str = ".") -> str:
