@@ -19,14 +19,23 @@ AI coding agents work better when they have clear project context. Repeating tha
 
 ## Quickstart
 
+Most days, remember only one command:
+
+```powershell
+ctx handoff "Describe what changed or what you want next"
+```
+
+It saves the note, snapshots Git, builds the Markdown context packs, and copies `NEXT_PROMPT.md` to the clipboard.
+
+First-time setup in a project:
+
 ```powershell
 git clone https://github.com/kuto87/ctx-ledger.git
 cd ctx-ledger
 python -m pip install -e ".[dev]"
 ctx init
-ctx note "Implement the first CLI workflow."
-ctx snap
-ctx ask --target chatgpt
+ctx config --lang ja --target chatgpt
+ctx handoff "Implement the first CLI workflow."
 ```
 
 `ctx ask` writes Markdown files to `.ctx-ledger/generated/` and copies `NEXT_PROMPT.md` to the clipboard by default.
@@ -46,6 +55,8 @@ python -m pip install ctx-ledger
 ## Commands
 
 ```powershell
+ctx
+ctx handoff "message"
 ctx init
 ctx note "message"
 ctx snap
@@ -59,6 +70,8 @@ ctx status --lang ja
 ctx config --lang ja --target chatgpt --budget 4000
 ctx doctor
 ```
+
+Run `ctx` by itself to see a short beginner guide.
 
 ## Example output
 
@@ -110,6 +123,15 @@ Not included:
 ## Local-first by default
 
 `ctx-ledger` does not call OpenAI, Anthropic, or any other AI service. It does not require an API key. Generated context packs are local Markdown files.
+
+## Context size hint
+
+`budget` means a rough context size hint for the AI prompt, such as `4000`. It does not spend money and does not call an API. You can ignore it at first.
+
+```powershell
+ctx config --budget 4000
+ctx handoff "Summarize this change for the next AI chat"
+```
 
 ## Japanese output
 

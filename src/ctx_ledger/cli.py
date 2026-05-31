@@ -28,9 +28,19 @@ if hasattr(sys.stderr, "reconfigure"):
 
 app = typer.Typer(
     help="Generate clean context packs for AI coding agents.",
+    invoke_without_command=True,
     pretty_exceptions_show_locals=False,
 )
 console = Console()
+
+
+@app.callback()
+def main(ctx: typer.Context) -> None:
+    """Show a friendly guide when ctx is run without a subcommand."""
+
+    if ctx.invoked_subcommand is None:
+        print_quickstart()
+        raise typer.Exit()
 
 
 @app.command()
@@ -66,7 +76,7 @@ def snap() -> None:
 @app.command()
 def ask(
     target: Optional[str] = typer.Option(None, help="Target AI tool: chatgpt, codex, claude, cursor."),
-    budget: Optional[int] = typer.Option(None, help="Optional context budget hint."),
+    budget: Optional[int] = typer.Option(None, help="Optional context size hint, such as 4000."),
     fresh: bool = typer.Option(False, help="Mark this as a fresh/recovery handoff."),
     no_copy: bool = typer.Option(False, help="Do not copy NEXT_PROMPT.md to the clipboard."),
     lang: Optional[str] = typer.Option(None, help="Output language: en or ja."),
@@ -87,40 +97,44 @@ def ask(
         )
     except (git_utils.GitError, ValueError) as exc:
         raise typer.BadParameter(str(exc)) from exc
-    next_prompt = outputs["next_prompt"]
-    console.print(f"[green]Built[/green] {next_prompt.relative_to(Path.cwd())}")
-    console.print(f"[green]Built[/green] {outputs['delta_pack'].relative_to(Path.cwd())}")
-    console.print(f"[green]Built[/green] {outputs['recovery_pack'].relative_to(Path.cwd())}")
-    if no_copy:
+    print_build_result(outputs, language, no_copy)
+
+
+@app.command()
+def handoff(
+    message: Optional[str] = typer.Argument(None, help="Short note about what changed or what you want next."),
+    target: Optional[str] = typer.Option(None, help="Target AI tool: chatgpt, codex, claude, cursor."),
+    budget: Optional[int] = typer.Option(None, help="Optional context size hint, such as 4000."),
+    fresh: bool = typer.Option(False, help="Mark this as a fresh/recovery handoff."),
+    no_copy: bool = typer.Option(False, help="Do not copy NEXT_PROMPT.md to the clipboard."),
+    lang: Optional[str] = typer.Option(None, help="Output language: en or ja."),
+) -> None:
+    """One-command flow: optionally save a note, snapshot Git, and build the next prompt."""
+
+    try:
+        config = load_config(Path.cwd())
+        chosen_target = validate_target(str(target or config.get("default_target") or "chatgpt"))
+        language = validate_language(str(lang or config.get("default_language") or "en"))
+        chosen_budget = budget if budget is not None else normalize_budget(config.get("default_budget"))
+        ensure_initialized(Path.cwd())
+        if message:
+            note_path = create_note(message, Path.cwd())
+            console.print(f"[green]Saved note[/green] {note_path.relative_to(Path.cwd())}")
+        snapshot = create_snapshot(Path.cwd())
         console.print(
-            "[yellow]Clipboard copy skipped[/yellow]"
-            if language == "en"
-            else "[yellow]クリップボードへのコピーをスキップしました[/yellow]"
+            f"[green]Captured snapshot[/green] branch={snapshot['branch']} "
+            f"dirty={'yes' if snapshot['dirty'] else 'no'}"
         )
-        return
-    copied, error = copy_text(next_prompt.read_text(encoding="utf-8"))
-    if copied:
-        console.print(
-            "[green]Copied prompt to clipboard[/green]"
-            if language == "en"
-            else "[green]プロンプトをクリップボードにコピーしました[/green]"
+        outputs = build_context_packs(
+            Path.cwd(),
+            target=chosen_target,
+            budget=chosen_budget,
+            fresh=fresh,
+            language=language,
         )
-        console.print(
-            "Paste it into ChatGPT / Codex / Claude Code / Cursor."
-            if language == "en"
-            else "ChatGPT / Codex / Claude Code / Cursor に貼り付けてください。"
-        )
-    else:
-        console.print(
-            f"[yellow]Clipboard copy failed[/yellow] {error}"
-            if language == "en"
-            else f"[yellow]クリップボードへのコピーに失敗しました[/yellow] {error}"
-        )
-        console.print(
-            f"Prompt is still available at {next_prompt.relative_to(Path.cwd())}"
-            if language == "en"
-            else f"プロンプトは {next_prompt.relative_to(Path.cwd())} に保存されています"
-        )
+    except (git_utils.GitError, ValueError) as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    print_build_result(outputs, language, no_copy)
 
 
 @app.command()
@@ -171,8 +185,8 @@ def status(lang: Optional[str] = typer.Option(None, help="Output language: en or
 def configure(
     target: Optional[str] = typer.Option(None, help="Default target: chatgpt, codex, claude, cursor."),
     lang: Optional[str] = typer.Option(None, help="Default output language: en or ja."),
-    budget: Optional[int] = typer.Option(None, help="Default context budget hint."),
-    clear_budget: bool = typer.Option(False, help="Clear the default budget hint."),
+    budget: Optional[int] = typer.Option(None, help="Default context size hint, such as 4000."),
+    clear_budget: bool = typer.Option(False, help="Clear the default context size hint."),
 ) -> None:
     """Show or update ctx-ledger defaults."""
 
@@ -252,6 +266,45 @@ def normalize_budget(value: object) -> Optional[int]:
         raise ValueError("default_budget must be a number or null.") from exc
 
 
+def print_build_result(outputs: dict[str, Path], language: str, no_copy: bool) -> None:
+    """Print generated files and copy the next prompt unless disabled."""
+
+    next_prompt = outputs["next_prompt"]
+    console.print(f"[green]Built[/green] {next_prompt.relative_to(Path.cwd())}")
+    console.print(f"[green]Built[/green] {outputs['delta_pack'].relative_to(Path.cwd())}")
+    console.print(f"[green]Built[/green] {outputs['recovery_pack'].relative_to(Path.cwd())}")
+    if no_copy:
+        console.print(
+            "[yellow]Clipboard copy skipped[/yellow]"
+            if language == "en"
+            else "[yellow]クリップボードへのコピーをスキップしました[/yellow]"
+        )
+        return
+    copied, error = copy_text(next_prompt.read_text(encoding="utf-8"))
+    if copied:
+        console.print(
+            "[green]Copied prompt to clipboard[/green]"
+            if language == "en"
+            else "[green]プロンプトをクリップボードにコピーしました[/green]"
+        )
+        console.print(
+            "Paste it into ChatGPT / Codex / Claude Code / Cursor."
+            if language == "en"
+            else "ChatGPT / Codex / Claude Code / Cursor に貼り付けてください。"
+        )
+    else:
+        console.print(
+            f"[yellow]Clipboard copy failed[/yellow] {error}"
+            if language == "en"
+            else f"[yellow]クリップボードへのコピーに失敗しました[/yellow] {error}"
+        )
+        console.print(
+            f"Prompt is still available at {next_prompt.relative_to(Path.cwd())}"
+            if language == "en"
+            else f"プロンプトは {next_prompt.relative_to(Path.cwd())} に保存されています"
+        )
+
+
 def print_config_table(config: dict[str, object]) -> None:
     """Print current config defaults."""
 
@@ -262,6 +315,29 @@ def print_config_table(config: dict[str, object]) -> None:
     table.add_row("default_language", str(config.get("default_language") or "en"))
     table.add_row("default_budget", str(config.get("default_budget") or "(none)"))
     console.print(table)
+
+
+def print_quickstart() -> None:
+    """Print a beginner-friendly command guide."""
+
+    console.print("[bold]ctx-ledger[/bold] - AI handoff notes for your project")
+    console.print("")
+    console.print("[bold]Most days, use just this:[/bold]")
+    console.print('  ctx handoff "what changed or what you want next"')
+    console.print("")
+    console.print("[bold]First setup in a project:[/bold]")
+    console.print("  ctx init")
+    console.print("  ctx config --lang ja --target chatgpt")
+    console.print("")
+    console.print("[bold]Useful checks:[/bold]")
+    console.print("  ctx status")
+    console.print("  ctx doctor")
+    console.print("")
+    console.print("[bold]What is budget?[/bold]")
+    console.print("  A rough context size hint for the AI prompt, for example 4000.")
+    console.print("  You can ignore it at first.")
+    console.print("")
+    console.print("Run [cyan]ctx --help[/cyan] to see every command.")
 
 
 if __name__ == "__main__":
